@@ -12,5 +12,8 @@ const Column = styled.div`
 const Center = styled.div`
   ${tw`w-1/3 mx-auto`};
 `
+const CenterLarge = styled.div`
+  ${tw`w-2/3 mx-auto`};
+`
 
-export { Row, Column, Center }
+export { Row, Column, Center, CenterLarge }

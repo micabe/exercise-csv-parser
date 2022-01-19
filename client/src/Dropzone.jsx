@@ -1,23 +1,64 @@
-import PropTypes from 'prop-types'
 import { PureComponent } from 'react'
-import { FormHelperText, IconButton } from '@material-ui/core'
 import { DropzoneArea } from 'material-ui-dropzone'
-import { Row, Center } from './atoms/Grid'
+import _ from 'lodash'
+import { Row, Center, CenterLarge } from './atoms/Grid'
+import { ButtonSmall } from './atoms/Buttons'
+import ListItems from './ListItems'
 import axios from 'axios'
 
 export default class Dropzone extends PureComponent {
-  static propTypes = {
-    uploadExpertCv: PropTypes.func.isRequired,
-    setFieldValue: PropTypes.func.isRequired,
+  state = {
+    files: [],
+    rows: [],
+    validateRows: [],
+    validate: false,
   }
 
-  state = {
-    acrobatIcon: null,
-    files: [],
+  toggle = () => {
+    const { files } = this.state
+
+    if (files.length > 0) {
+      this.setState(state => ({
+        ...state,
+        validate: !this.state.validate,
+      }))
+    }
+  }
+
+  onLoadingError = (e, row) => {
+    e.persist()
+    this.setState(state => ({
+      validateRows: [
+        ...state.validateRows,
+        {
+          ...row,
+          error: 'Cannot Load image',
+        },
+      ],
+    }))
+  }
+
+  onLoadingSuccess = (e, row) => {
+    e.persist()
+    const { naturalHeight, naturalWidth } = e.target
+
+    this.setState(state => ({
+      validateRows: [
+        ...state.validateRows,
+        {
+          ...row,
+          dimensions: {
+            naturalHeight,
+            naturalWidth,
+          },
+        },
+      ],
+    }))
   }
 
   handleChange = async (files, type) => {
     const file = files.pop()
+    if (!file) return
     this.setState(
       state => ({
         files: [
@@ -31,29 +72,32 @@ export default class Dropzone extends PureComponent {
       () => {
         const formData = new FormData()
         formData.append('image', file)
-        axios.post('http://localhost:5000/api/v1/uploads', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        })
+        axios
+          .post('http://localhost:5000/api/v1/uploads', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          .then(({ data }) => {
+            this.setState(state => ({
+              ...state,
+              rows: data.response[0],
+            }))
+          })
       },
     )
   }
 
   render() {
-    const { cv } = this.props
+    const { validate, rows, validateRows } = this.state
+
+    const merged = _.merge(_.keyBy(rows, 'id'), _.keyBy(validateRows, 'id'))
+    const values = _.values(merged)
+
     return (
       <Row>
-        <Center>
-          <FormHelperText variant="filled">CSV upload</FormHelperText>
-          <div>
-            {cv && cv.normal && (
-              <IconButton label="CSV upload">
-                <a href="http://localhost:5000/api/v1/uploads" target="_blank" rel="noopener noreferrer">
-                  .CSV
-                </a>
-              </IconButton>
-            )}
+        {!validate ? (
+          <Center>
             <DropzoneArea
               dropzoneText=".csv uniquement"
               filesLimit={1}
@@ -61,8 +105,18 @@ export default class Dropzone extends PureComponent {
               onChange={this.handleChange}
               acceptedFiles={['text/csv']}
             />
-          </div>
-        </Center>
+            <ButtonSmall type="button" onClick={this.toggle}>
+              Validate
+            </ButtonSmall>
+          </Center>
+        ) : (
+          <CenterLarge>
+            <ListItems rows={values} onLoadingError={this.onLoadingError} onLoadingSuccess={this.onLoadingSuccess} />
+            <ButtonSmall type="button" onClick={this.toggle}>
+              Upload new CSV
+            </ButtonSmall>
+          </CenterLarge>
+        )}
       </Row>
     )
   }
